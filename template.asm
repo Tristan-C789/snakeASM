@@ -56,41 +56,9 @@ addi    sp, zero, LEDS
 ;     This procedure should never return.
 main:
     ; TODO: Finish this procedure.
-	;	call test_proc
-	or r30, zero, ra
+	call init_game
 
-	ori t0, zero, DIR_RIGHT
-	stw t0, GSA(zero)
-
-	ori t1, zero, 69
-	stw t1, 0x2010(zero)
-
-loop:
-	call clear_leds
-	call get_input
-	call hit_test
-	
-	ori t0, zero, 1
-	beq v0, t0, main_1
-
-	ori t0, zero, 2
-	beq v0, t0, main_2
-
-	call move_snake
-	call draw_array
-
-    jmpi loop
-
-main_1:
-	call create_food
-
-	jmpi loop
-
-main_2:
-; game has ended
-	ret r30
-
-
+	ret
 
 
 turn_on_all:
@@ -193,7 +161,69 @@ ds_done:
 
 ; BEGIN: init_game
 init_game:
+	; --- Sets snake's position to 0 and length to 1 ---
+	stw zero, HEAD_X(zero)
+	stw zero, HEAD_Y(zero)
 
+	stw zero, TAIL_X(zero)
+	stw zero, TAIL_Y(zero)
+
+	; --- Clears the GSA ---
+	ori t0, zero, 11				; Sets x to 11
+ig_for_x:							; --- TOP OF X LOOP ---
+	blt t0, zero, ig_x_end			; While x > 0, else goes to the end of the x loop
+
+	ori t1, zero, 7					; Sets y to 7
+		
+ig_for_y:							; --- TOP OF Y LOOP ---
+	blt t1, zero, ig_y_end			; While y > 0, else goes to the end of the y loop
+
+	slli t2, t0, 3					; = x * 8
+	add t2, t2, t1					; = x * 8 + y which is the corresponding index/offset in the GSA 
+
+	slli t3, t2, 2					; Multiplies by 4 the GSA index to get the offset
+
+	stw zero, GSA(t3)					; -> Sets this GSA value to 0
+	
+	addi t1, t1, -1					; Removes 1 from y
+	jmpi ig_for_y					; Goes to the top of y loop
+
+ig_y_end:							; --- END OF Y LOOP ---
+	addi t0, t0, -1					; Removes 1 from x
+	jmpi ig_for_x					; Goes to the top of x loop
+
+ig_x_end:							; --- END OF X LOOP ---
+
+	; --- Initializes the GSA with snake position and direction ---
+	ori t0, zero, DIR_RIGHT 		; Sets the default direction
+	stw t0, GSA(zero)				; Sets the default position
+
+	; --- Creates food ---
+	or t0, zero, ra					; Saves the current return address
+	call create_food				; Calls CREATE_FOOD procedure
+	or ra, zero, t0					; Restores the return address
+
+	; --- Sets all temporary registers to 0 ---
+	or t0, zero, zero
+	or t1, zero, zero
+	or t2, zero, zero
+	or t3, zero, zero
+	or t4, zero, zero
+	or t5, zero, zero
+	or t6, zero, zero
+	or t7, zero, zero
+
+	; --- Sets all saved registers to 0 ---
+	or s0, zero, zero
+	or s1, zero, zero
+	or s2, zero, zero
+	or s3, zero, zero
+	or s4, zero, zero
+	or s5, zero, zero
+	or s6, zero, zero
+	or s7, zero, zero
+
+	ret
 ; END: init_game
 
 
@@ -565,33 +595,33 @@ restore_checkpoint:
 
 ; BEGIN: blink_score
 blink_score:
-	addi s1, zero, 8 
-	ldw s0, SEVEN_SEGS(s1) 
-	addi s1, zero, 12 
-	ldw s1, SEVEN_SEGS(s1)
+	addi s1, zero, 8 				; Gets the tens offset
+	ldw s0, SEVEN_SEGS(s1) 		; Gets the tens
+	addi s1, zero, 12 				; Gets the units offset
+	ldw s1, SEVEN_SEGS(s1)			; Gets the units
 	
-	stw zero, SEVEN_SEGS(zero) 
+	stw zero, SEVEN_SEGS(zero) 	; Turns off thousands 
 	addi s2, zero, 4 
-	stw zero, SEVEN_SEGS(s2) 
+	stw zero, SEVEN_SEGS(s2) 		; Turns off hundreds
 	addi s2, zero, 8 
-	stw zero, SEVEN_SEGS(s2) 
+	stw zero, SEVEN_SEGS(s2) 		; Turns off tens
 	addi s2, zero, 12 
-	stw zero, SEVEN_SEGS(s2) 
+	stw zero, SEVEN_SEGS(s2) 		; Turns off units
 
-
-	add s3, zero, ra
-	call wait 
-	add ra, zero ,s3
+	; --- ONLY DO THAT WHEN TESTING ON GECKO
+	add s3, zero, ra				; Saves the return address
+	call wait 						; Calls WAIT function --- ONLY WHEN 
+	add ra, zero ,s3				; Restores the return address
+	; -----
 	
-	ldw s4, digit_map(zero)
-	stw s4, SEVEN_SEGS(zero) 
+	ldw s4, digit_map(zero)		; Gets the representation of 0
+	stw s4, SEVEN_SEGS(zero) 		; Sets the thousands to 0
 	addi s5, zero, 4
-	stw s4, SEVEN_SEGS(s5) 
-
+	stw s4, SEVEN_SEGS(s5) 		; Sets the hundreds to 0
 	
-	addi s6, zero, 8 
+	addi s6, zero, 8 				; Restores the tens value
 	stw s0, SEVEN_SEGS(s6) 
-	addi s6, zero, 12 
+	addi s6, zero, 12 				; Restores the units value
 	stw s6, SEVEN_SEGS(s6)
 	
 	ret 
@@ -600,13 +630,13 @@ blink_score:
 ; END: blink_score
 
 wait: 
-	addi t0, zero, 1
+	addi t0, zero, 1				; Initializes counter to 2^24 ~ 50 000 000 / 3
 	slli t0, t0, 24
 
 wait_loop:
-	beq t0, zero, wait_done 
-	addi t0, t0, -1
-	jmpi wait_loop 
+	beq t0, zero, wait_done 		; Goes to DONE procedure if counter is equal to 0
+	addi t0, t0, -1					; Decreases counter by 1
+	jmpi wait_loop 					
 	
 wait_done: 
 	ret
