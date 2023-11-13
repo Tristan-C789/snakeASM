@@ -199,9 +199,12 @@ ig_x_end:							; --- END OF X LOOP ---
 	stw t0, GSA(zero)				; Sets the default position
 
 	; --- Creates food ---
-	or t0, zero, ra					; Saves the current return address
+	or s0, zero, ra					; Saves the current return address
 	call create_food				; Calls CREATE_FOOD procedure
-	or ra, zero, t0					; Restores the return address
+	or ra, zero, s0					; Restores the return address
+
+	; --- Sets score to 0 ---
+	stw zero, SCORE(zero)
 
 	; --- Sets all temporary registers to 0 ---
 	or t0, zero, zero
@@ -222,6 +225,19 @@ ig_x_end:							; --- END OF X LOOP ---
 	or s5, zero, zero
 	or s6, zero, zero
 	or s7, zero, zero
+
+	; --- Sets all argument registers to 0 ---
+	or a0, zero, zero
+	or a1, zero, zero
+	or a2, zero, zero
+	or a3, zero, zero
+
+	; --- Sets all return registers to 0 ---
+	or v0, zero, zero
+	or v1, zero, zero
+
+	; --- Sets stack pointer back to original position ---
+	ori sp, zero, LEDS
 
 	ret
 ; END: init_game
