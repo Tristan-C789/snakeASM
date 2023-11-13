@@ -55,8 +55,62 @@ addi    sp, zero, LEDS
 ; return values
 ;     This procedure should never return.
 main:
-    ; TODO: Finish this procedure.
-	call init_game
+   	ldw zero, CP_VALID(zero)					; Sets the CP_VALID to 0
+
+main_init_game:
+	call init_game								; Initializes the game
+
+main_get_input:
+	call wait									; ------ MAKES THE GAME PLAYABLE
+	call get_input								; Reads the input
+
+	ori t0, zero, BUTTON_CHECKPOINT
+	beq v0, t0, main_restore_checkpoint			; If the input is equal to CHECKPOINT, then go to RESTORE_CHECKPOINT
+	
+	call hit_test								; Else call HIT_TEST
+
+	ori t0, zero, 1
+	beq v0, t0, main_food_eaten				; If snake collides with food, go to FOOD_EATEN
+
+	ori t0, zero, 2								
+	beq v0, t0, main_init_game					; Else if snake dies, go to INIT_GAME
+	
+	call move_snake								; Else move the snake
+
+	jmpi main_redraw							; Go to REDRAW procedure
+
+main_food_eaten:
+	ldw t0, SCORE(zero)							; Gets the current score
+	addi t0, t0, 1								; Increments the score by 1
+	stw t0, SCORE(zero)							; Stores back the score
+	
+	call display_score							; Displays the updated score
+	call move_snake								; Moves snake
+	call create_food							; Create a new food
+	call save_checkpoint						; Tries to save the game
+
+	beq v0, zero, main_redraw					; If game was not saved, go to REDRAW
+
+	jmpi main_blink_score						; Go to BLINK_SCORE
+
+main_redraw:	
+	call clear_leds								; Clears all LEDs
+	call draw_array								; Draw the updated LEDs array
+
+	jmpi main_get_input							; Goes back to GET_INPUT
+	
+
+main_restore_checkpoint:
+	call restore_checkpoint					; Restores to the checkpoint if possible
+	
+	beq v0, zero, main_get_input				; If checkpoint was not done, go back to GET_INPUT
+
+	jmpi main_blink_score						; Else go to BLINK_SCORE
+	
+main_blink_score:
+	call blink_score							; Makes the score blink
+	
+	jmpi main_redraw							; Go to REDRAW
 
 	ret
 
@@ -118,44 +172,41 @@ set_pixel:
 
 ; BEGIN: display_score
 display_score:
-	ldw t0, digit_map(zero)
-	stw t0, SEVEN_SEGS(zero)
-	addi t1, zero, 4
-	stw t0, SEVEN_SEGS(t1)
-	ldw t0, SCORE(zero)
-	addi t1, zero, 10 
-	add t2, t0, zero  
-	addi t3, zero, 0 
-	
+	ldw t0, digit_map(zero)		; Gets the representation of zero
+	stw t0, SEVEN_SEGS(zero)		; Sets the thousands to 0
+	addi t1, zero, 4				
+	stw t0, SEVEN_SEGS(t1)			; Sets the hundreds to 0
+
+	ldw t0, SCORE(zero)				; Gets the score
+	addi t1, zero, 10 				; Sets the modulo
+	add t2, t0, zero  				; Copies the score
+	addi t3, zero, 0 				; Initializes tens counter
 	
 ds_while_unite: 
-	blt t2, t1, ds_remove_units
-	sub t2, t2, t1
-	jmpi ds_while_unite
+	blt t2, t1, ds_remove_units	; If score is less then 10, then go to REMOVE_UNITS
+	sub t2, t2, t1					; Substracts 10 from the score
+	jmpi ds_while_unite			; Repeats
 
 
 ds_remove_units: 
-	sub t0, t0, t2
+	sub t0, t0, t2					; Removes the units from the score, leaving the tens only
 
 ds_while_tens:
-	blt t0, t1, ds_done
-	sub t0, t0, t1
-	addi t3, t3, 1 
+	blt t0, t1, ds_done				; While the truncated score is more than 10
+	sub t0, t0, t1					; Removes 10 from the score
+	addi t3, t3, 1 					; Adds 1 to the tens counter
 	jmpi ds_while_tens
 	
 	
 ds_done:
 	
-	ldw t0, digit_map(t0) 
-	ldw t2, digit_map(t2) 
+	ldw t0, digit_map(t0) 			; Gets the representation of the tens
+	ldw t2, digit_map(t2)			; Gets the representation of the units
 	addi t1, zero, 8
-	stw t0, SEVEN_SEGS(t1) 
+	stw t0, SEVEN_SEGS(t1) 		; Sets the tens
 	addi t1, zero, 12
-	stw t2, SEVEN_SEGS(t1)
+	stw t2, SEVEN_SEGS(t1)			; Sets the units
 	ret
-	
-
-	
 ; END: display_score
 
 
@@ -362,6 +413,8 @@ get_input:
 	
 	slli t3, t3, 2					; Multiplies by 4 the GSA index to get the offset
 
+	ldw t5, GSA(t3)					; Gets the current direction
+
 	andi t2, t1, 16					; Checks if checkpoint button is pressed, priority #1
 	bne t2, zero, gi_case_ck		; If yes, goes to BUTTON_CHECKPOINT procedure
 
@@ -370,7 +423,11 @@ gi_case_left:						; --- BUTTON LEFT PROCEDURE ---
 	beq t2, zero, gi_case_up		; Else goes to BUTTON_UP procedure
 
 	ori v0, zero, BUTTON_LEFT 		; Outputs value BUTTON_LEFT
-	stw v0, GSA(t3)					; Updates the GSA accordingly
+
+	ori t6, zero, DIR_RIGHT		
+	beq t6, t5, gi_done				; If the snake is going to opposite direction, don't update the direction
+
+	stw v0, GSA(t3)					; Else, updates the GSA accordingly
 
 	jmpi gi_done					; Goes to DONE procedure
 
@@ -379,6 +436,10 @@ gi_case_up:							; --- BUTTON UP PROCEDURE ---
 	beq t2, zero, gi_case_down 	; Else goes to BUTTON_DOWN procedure
 	
 	ori v0, zero, BUTTON_UP 		; Outputs value BUTTON_UP
+	
+	ori t6, zero, DIR_DOWN		
+	beq t6, t5, gi_done				; If the snake is going to opposite direction, don't update the direction
+
 	stw v0, GSA(t3)					; Updates the GSA accordingly
 
 	jmpi gi_done					; Goes to DONE procedure
@@ -388,6 +449,10 @@ gi_case_down:						; --- BUTTON DOWN PROCEDURE ---
 	beq t2, zero, gi_case_right	; Else goes to BUTTON_RIGHT procedure
 
 	ori v0, zero, BUTTON_DOWN		; Outputs value BUTTON_DOWN
+
+	ori t6, zero, DIR_UP		
+	beq t6, t5, gi_done				; If the snake is going to opposite direction, don't update the direction	
+
 	stw v0, GSA(t3)					; Updates the GSA accordingly
 
 	jmpi gi_done					; Goes to DONE procedure
@@ -397,6 +462,10 @@ gi_case_right:						; --- BUTTON RIGHT PROCEDURE ---
 	beq t2, zero, gi_none			; Else goes to NONE procedure
 
 	ori v0, zero, BUTTON_RIGHT		; Outputs value BUTTON_RIGHT
+
+	ori t6, zero, DIR_LEFT		
+	beq t6, t5, gi_done				; If the snake is going to opposite direction, don't update the direction	
+
 	stw v0, GSA(t3)					; Updates the GSA accordingly
 
 	jmpi gi_done					; Goes to DONE procedure
@@ -599,13 +668,59 @@ mt_down:
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
+	ori v0, zero, 0					; Default return value set to 0
+	stw zero, CP_VALID(zero)		; Default CP_VALID value set to 0
+	
+	ldw t0, SCORE(zero)				; Gets the score
+	ori t1, zero, 10				; Sets the modulo to 10
+sc_modulo:
+	blt t0, t1, sc_decision		; While score > 10
+	addi t0, t0, -10				; Removes 10 from the score
+	jmpi sc_modulo
 
+sc_decision:
+	bne t0, zero, sc_ret			; If score % 10 is not equal to 0 then return	
+
+sc_make_cp:	
+	ori t1, zero, HEAD_X			; First element
+	addi t2, t1, 408				; Last element + 4
+			
+sc_loop:
+	ldw t3, 0(t1)					; Gets the current element 
+	stw t3, 0x200(t1)				; Stores it in CP section, which is a 0x200 offset
+	
+	addi t1, t1, 4					; Moves to the next element
+
+	bne t1, t2, sc_loop				; Repeats while last element is not reached
+	
+	ori t0, zero, 1					
+	stw t0, CP_VALID(zero)			; Sets CP_VALID to 1
+	ori v0, zero, 1					; Sets return value to 1
+sc_ret:
+	ret
 ; END: save_checkpoint
 
 
 ; BEGIN: restore_checkpoint
 restore_checkpoint:
+	ldw t0, CP_VALID(zero)
+	or v0, zero, t0					; Sets return value to CP_VALID
 
+	beq t0, zero, rc_done			; If CP_VALID is equal to 0 then go to DONE
+		
+rc_restore_cp:	
+	ori t1, zero, HEAD_X			; First element
+	addi t2, t1, 408				; Last element + 4
+			
+rc_loop:
+	ldw t3, 0x200(t1)				; Gets the current CP element 
+	stw t3, 0(t1)					; Stores it in the current element
+	
+	addi t1, t1, 4					; Moves to the next element
+
+	bne t1, t2, sc_loop				; Repeats while last element is not reached
+rc_done:
+	ret
 ; END: restore_checkpoint
 
 
@@ -646,8 +761,8 @@ blink_score:
 ; END: blink_score
 
 wait: 
-	addi t0, zero, 1				; Initializes counter to 2^24 ~ 50 000 000 / 3
-	slli t0, t0, 24
+	addi t0, zero, 1				; Initializes counter to 2^22 ~ 4 000 000
+	slli t0, t0, 22
 
 wait_loop:
 	beq t0, zero, wait_done 		; Goes to DONE procedure if counter is equal to 0
