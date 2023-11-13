@@ -603,14 +603,13 @@ wait:
 	addi t0, zero, 1
 	slli t0, t0, 24
 
-	wait_loop:
-		
-		beq t0, zero, wait_done 
-		addi t0, t0, -1
-		jmpi wait_loop 
+wait_loop:
+	beq t0, zero, wait_done 
+	addi t0, t0, -1
+	jmpi wait_loop 
 	
-	wait_done: 
-		ret
+wait_done: 
+	ret
 		
 
 digit_map:
