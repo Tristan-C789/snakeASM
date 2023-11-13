@@ -150,6 +150,43 @@ set_pixel:
 
 ; BEGIN: display_score
 display_score:
+	ldw t0, digit_map(zero)
+	stw t0, SEVEN_SEGS(zero)
+	addi t1, zero, 4
+	stw t0, SEVEN_SEGS(t1)
+	ldw t0, SCORE(zero)
+	addi t1, zero, 10 
+	add t2, t0, zero  
+	addi t3, zero, 0 
+	
+	
+ds_while_unite: 
+	blt t2, t1, ds_remove_units
+	sub t2, t2, t1
+	jmpi ds_while_unite
+
+
+ds_remove_units: 
+	sub t0, t0, t2
+
+ds_while_tens:
+	blt t0, t1, ds_done
+	sub t0, t0, t1
+	addi t3, t3, 1 
+	jmpi ds_while_tens
+	
+	
+ds_done:
+	
+	ldw t0, digit_map(t0) 
+	ldw t2, digit_map(t2) 
+	addi t1, zero, 8
+	stw t0, SEVEN_SEGS(t1) 
+	addi t1, zero, 12
+	stw t2, SEVEN_SEGS(t1)
+	ret
+	
+
 	
 ; END: display_score
 
@@ -528,5 +565,62 @@ restore_checkpoint:
 
 ; BEGIN: blink_score
 blink_score:
+	addi s1, zero, 8 
+	ldw s0, SEVEN_SEGS(s1) 
+	addi s1, zero, 12 
+	ldw s1, SEVEN_SEGS(s1)
+	
+	stw zero, SEVEN_SEGS(zero) 
+	addi s2, zero, 4 
+	stw zero, SEVEN_SEGS(s2) 
+	addi s2, zero, 8 
+	stw zero, SEVEN_SEGS(s2) 
+	addi s2, zero, 12 
+	stw zero, SEVEN_SEGS(s2) 
+
+
+	add s3, zero, ra
+	call wait 
+	add ra, zero ,s3
+	
+	ldw s4, digit_map(zero)
+	stw s4, SEVEN_SEGS(zero) 
+	addi s5, zero, 4
+	stw s4, SEVEN_SEGS(s5) 
+
+	
+	addi s6, zero, 8 
+	stw s0, SEVEN_SEGS(s6) 
+	addi s6, zero, 12 
+	stw s6, SEVEN_SEGS(s6)
+	
+	ret 
+
 
 ; END: blink_score
+
+wait: 
+	addi t0, zero, 1
+	slli t0, t0, 24
+
+	wait_loop:
+		
+		beq t0, zero, wait_done 
+		addi t0, t0, -1
+		jmpi wait_loop 
+	
+	wait_done: 
+		ret
+		
+
+digit_map:
+	.word 0xFC ;0
+	.word 0x60 ;1
+	.word 0xDA ;2
+	.word 0xF2 ;3
+	.word 0x66 ;4
+	.word 0xB6 ;5
+	.word 0xBE ;6
+	.word 0xE0 ;7
+	.word 0xFE ;8
+	.word 0xF6 ;9
