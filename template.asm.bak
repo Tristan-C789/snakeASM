@@ -59,6 +59,7 @@ main:
 
 main_init_game:
 	call init_game								; Initializes the game
+	call display_score							; Displays the initial score
 
 main_get_input:
 	call wait									; ------ MAKES THE GAME PLAYABLE
@@ -74,7 +75,8 @@ main_get_input:
 
 	ori t0, zero, 2								
 	beq v0, t0, main_init_game					; Else if snake dies, go to INIT_GAME
-	
+
+	ori a0, zero, 0								; Makes argument to 0	
 	call move_snake								; Else move the snake
 
 	jmpi main_redraw							; Go to REDRAW procedure
@@ -85,17 +87,21 @@ main_food_eaten:
 	stw t0, SCORE(zero)							; Stores back the score
 	
 	call display_score							; Displays the updated score
+
+	ori a0, zero, 1								; Makes the argument to 1
 	call move_snake								; Moves snake
 	call create_food							; Create a new food
+	or a0, zero, zero							; Resets the argument to 0
 	call save_checkpoint						; Tries to save the game
 
 	beq v0, zero, main_redraw					; If game was not saved, go to REDRAW
 
-	jmpi main_blink_score
+	jmpi main_blink_score						; Go to BLINK_SCORE
 
 main_redraw:	
 	call clear_leds								; Clears all LEDs
 	call draw_array								; Draw the updated LEDs array
+	call display_score							; Displays the score
 
 	jmpi main_get_input							; Goes back to GET_INPUT
 	
@@ -111,22 +117,6 @@ main_blink_score:
 	call blink_score							; Makes the score blink
 	
 	jmpi main_redraw							; Go to REDRAW
-
-	ret
-
-
-turn_on_all:
-	ori t0, t0, 0xFFFF 				; Stores 0xFFFF_FFFF in t0
-	slli t0, t0, 16
-	ori t0, t0, 0xFFFF
-
-	stw t0, LEDS(zero)				; Sets LEDS[0] to LEDS[31] to 1
-
-	ori t1, zero, 4					; Sets the offset to 4
-	stw t0, LEDS(t1)				; Sets LEDS[32] to LEDS[63] to 1
-
-	slli t1, t1, 1					; Sets the offset to 8
-	stw t0, LEDS(t1)				; Sets LEDS[64] to LEDS[95] to 1
 
 	ret
 
@@ -179,34 +169,29 @@ display_score:
 
 	ldw t0, SCORE(zero)				; Gets the score
 	addi t1, zero, 10 				; Sets the modulo
-	add t2, t0, zero  				; Copies the score
-	addi t3, zero, 0 				; Initializes tens counter
+	addi t2, zero, 0 				; Initializes tens counter
 	
-ds_while_unite: 
-	blt t2, t1, ds_remove_units	; If score is less then 10, then go to REMOVE_UNITS
-	sub t2, t2, t1					; Substracts 10 from the score
-	jmpi ds_while_unite			; Repeats
+ds_while: 
+	blt t0, t1, ds_done				; If score is less then 10, then go to REMOVE_UNITS
+	addi t0, t0, -10				; Substracts 10 from the score
+	addi t2, t2, 1					; Add 1 to the tens
+	jmpi ds_while					; Repeats
 
-
-ds_remove_units: 
-	sub t0, t0, t2					; Removes the units from the score, leaving the tens only
-
-ds_while_tens:
-	blt t0, t1, ds_done				; While the truncated score is more than 10
-	sub t0, t0, t1					; Removes 10 from the score
-	addi t3, t3, 1 					; Adds 1 to the tens counter
-	jmpi ds_while_tens
-	
-	
 ds_done:
-	
-	ldw t0, digit_map(t0) 			; Gets the representation of the tens
-	ldw t2, digit_map(t2)			; Gets the representation of the units
-	addi t1, zero, 8
-	stw t0, SEVEN_SEGS(t1) 		; Sets the tens
-	addi t1, zero, 12
-	stw t2, SEVEN_SEGS(t1)			; Sets the units
+	slli t0, t0, 2					; Offsets the units to get the map index
+	slli t2, t2, 2					; Offset the tens to get the map index
+
+	ldw	t0, digit_map(t0)			; Gets the representation of the units
+	ldw t2, digit_map(t2)			; Gets the representation of the tens
+
+	ori t1, zero, 12				; Gets the units offset
+	stw t0, SEVEN_SEGS(t1)			; Sets the units
+
+	ori t1, zero, 8					; Gets the tens offset
+	stw t2, SEVEN_SEGS(t1)			; Sets the tens
+
 	ret
+
 ; END: display_score
 
 
@@ -373,11 +358,11 @@ ht_new_coord:
 	slli t0, t0, 2					; Multiplies by 4 the GSA index to get the offset
 	ldw t1, GSA(t0)					; Gets next snake's head cell value
 	
-	or v0, v0, zero					; Sets the default return value to 0
+	ori v0, zero, 0					; Sets the default return value to 0
 	beq t1, zero, ht_done			; Goes to the DONE procedure if cell is empty
 	
 	ori t0, zero, FOOD				
-	beq t1, t0, ht_hit_food			; Goes to the HIT_FOOD procedure if snake is going to hit food
+	beq t1, t0, ht_hit_food		; Goes to the HIT_FOOD procedure if snake is going to hit food
 	
 	ori t0, zero, DIR_LEFT			; Checks if next cell value is greater or equal to 1
 	bge t1, t0, ht_hit_obs			; Goes to the HIT_OBS procedure if snake is going to hit itself
@@ -761,8 +746,8 @@ blink_score:
 ; END: blink_score
 
 wait: 
-	addi t0, zero, 1				; Initializes counter to 2^22 ~ 4 000 000
-	slli t0, t0, 22
+	addi t0, zero, 1				; Initializes counter to 2^22 ~ 2 000 000
+	slli t0, t0, 21
 
 wait_loop:
 	beq t0, zero, wait_done 		; Goes to DONE procedure if counter is equal to 0
