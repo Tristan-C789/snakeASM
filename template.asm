@@ -55,7 +55,7 @@ addi    sp, zero, LEDS
 ; return values
 ;     This procedure should never return.
 main:
-   	ldw zero, CP_VALID(zero)					; Sets the CP_VALID to 0
+   	stw zero, CP_VALID(zero)					; Sets the CP_VALID to 0
 
 main_init_game:
 	call init_game								; Initializes the game
@@ -661,60 +661,65 @@ mt_down:
 
 ; BEGIN: save_checkpoint
 save_checkpoint:
-	ori v0, zero, 0					; Default return value set to 0
-	stw zero, CP_VALID(zero)		; Default CP_VALID value set to 0
-	
 	ldw t0, SCORE(zero)				; Gets the score
-	ori t1, zero, 10				; Sets the modulo to 10
-sc_modulo:
-	blt t0, t1, sc_decision		; While score > 10
-	addi t0, t0, -10				; Removes 10 from the score
-	jmpi sc_modulo
+	addi t1, zero, 10				; Sets the modulo to 10
 
-sc_decision:
-	bne t0, zero, sc_ret			; If score % 10 is not equal to 0 then return	
-
-sc_make_cp:	
-	ori t1, zero, HEAD_X			; First element
-	addi t2, t1, 408				; Last element + 4
-			
 sc_loop:
-	ldw t3, 0(t1)					; Gets the current element 
-	stw t3, 0x204(t1)				; Stores it in CP section, which is a 0x200 offset
-	
-	addi t1, t1, 4					; Moves to the next element
+	blt t0, t1, sc_end_loop			; If the updated score is less than 10, then continue
+	sub t0, t0, t1	 				; Else remove the modulo from the score
+	br sc_loop						; Go to top of loop
 
-	bne t1, t2, sc_loop				; Repeats while last element is not reached
-	
-	ori t0, zero, 1					
-	stw t0, CP_VALID(zero)			; Sets CP_VALID to 1
-	ori v0, zero, 1					; Sets return value to 1
+sc_end_loop:
+	addi v0, zero, 0				; Sets the return value to 0
 
-sc_ret:
+	bne t0, zero, sc_end			; If the updated score is not equal to then go to the end
+
+	addi v0, zero, 1				; Updates the return value to 1
+	stw v0, CP_VALID(zero)			; Sets CP_VALID to 1
+
+	addi t0, zero, HEAD_X			; Gets the first element to copy
+	addi t1, zero, CP_HEAD_X		; Gets the first place to copy to 
+
+	addi t2, zero, 0x1198			; Gets the upper limit
+
+sc_save:
+	beq t0, t2, sc_end				; While the elements are to be copied
+	
+	ldw t3, 0(t0)					; Gets the element
+	stw t3, 0(t1)					; Copies it
+
+	addi t0, t0, 4					; Gets the next element
+	addi t1, t1, 4					; Gets the next place to copy to
+
+	br sc_save
+
+sc_end:
 	ret
 ; END: save_checkpoint
 
 
 ; BEGIN: restore_checkpoint
 restore_checkpoint:
-	ldw t0, CP_VALID(zero)
-	or v0, zero, t0					; Sets return value to CP_VALID
+	ldw v0, CP_VALID(zero)			; Gets CP_VALID
 
-	beq t0, zero, rc_done			; If CP_VALID is equal to 0 then go to DONE
-		
-rc_restore_cp:	
-	call blink_score				; Makes the score blink
-	ori t1, zero, HEAD_X			; First element
-	addi t2, t1, 408				; Last element + 4
-			
+	beq v0, zero, rc_end			; Checks if CP_VALID is equal to 1
+
+	addi t0, zero, HEAD_X			; Gets the first element to copy to
+	addi t1, zero, CP_HEAD_X		; Gets the first element to copy
+
+	addi t2, zero, 0x1198			; Gets the upper limit
 rc_loop:
-	ldw t3, 0x204(t1)				; Gets the current CP element 
-	stw t3, 0(t1)					; Stores it in the current element
+	beq t0, t2, rc_end				; While the elements are to be copied
 	
-	addi t1, t1, 4					; Moves to the next element
+	ldw t3, 0(t1)					; Gets the element
+	stw t3, 0(t0)					; Copies it
 
-	bne t1, t2, sc_loop				; Repeats while last element is not reached
-rc_done:
+	addi t0, t0, 4					; Gets the next place to copy to
+	addi t1, t1, 4					; Gets the next element
+
+	br rc_loop
+
+rc_end:
 	ret
 ; END: restore_checkpoint
 
