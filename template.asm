@@ -196,6 +196,10 @@ ds_done:
 
 ; BEGIN: init_game
 init_game:
+	; --- Stores the current return address ---
+	addi sp, sp, -4 
+	stw ra, 0(sp) 
+	
 	; --- Sets snake's position to 0 and length to 1 ---
 	stw zero, HEAD_X(zero)
 	stw zero, HEAD_Y(zero)
@@ -224,21 +228,12 @@ ig_GSA_cleared:
 	stw t0, GSA(zero)				; Sets the default position
 
 	; --- Creates food ---
-	addi sp, sp, -4
-	stw ra, 0(sp)					; Saves the current return address
-
 	call create_food				; Calls CREATE_FOOD procedure
 
-	ldw ra, 0(sp)					; Restores the return address
-	addi sp, sp, 4
-
 	; --- Sets score to 0 ---
-	stw zero, SCORE(zero)
+	stw zero, SCORE(zero)			; Stores 0 in SCORE
 
 	; --- Redraws LEDs ---
-	addi sp, sp, -4
-	stw ra, 0(sp)					; Saves the current return address
-
 	call clear_leds					; Clears the LEDs
 	call draw_array					; Draws the initial array
 	call display_score				; Displays the initial score
