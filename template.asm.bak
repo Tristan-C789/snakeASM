@@ -59,14 +59,13 @@ main:
 
 main_init_game:
 	call init_game								; Initializes the game
-	call display_score							; Displays the initial score
 
 main_get_input:
 	call wait									; ------ MAKES THE GAME PLAYABLE
 	call get_input								; Reads the input
 
 	ori t0, zero, BUTTON_CHECKPOINT
-	beq v0, t0, main_restore_checkpoint			; If the input is equal to CHECKPOINT, then go to RESTORE_CHECKPOINT
+	beq v0, t0, main_restore_checkpoint		; If the input is equal to CHECKPOINT, then go to RESTORE_CHECKPOINT
 	
 	call hit_test								; Else call HIT_TEST
 
@@ -103,7 +102,7 @@ main_redraw:
 	call draw_array								; Draw the updated LEDs array
 	call display_score							; Displays the score
 
-	jmpi main_get_input							; Goes back to GET_INPUT
+	jmpi main_get_input						; Goes back to GET_INPUT
 	
 
 main_restore_checkpoint:
@@ -241,6 +240,15 @@ ig_x_end:							; --- END OF X LOOP ---
 
 	; --- Sets score to 0 ---
 	stw zero, SCORE(zero)
+
+	; --- Redraws LEDs ---
+	stw ra, -4(sp)					; Stores the return address
+	
+	call clear_leds					; Clears the LEDs
+	call draw_array					; Draws the initial array
+	call display_score				; Displays the initial score
+
+	ldw ra, -4(sp)					; Restores the return address
 
 	; --- Sets all temporary registers to 0 ---
 	or t0, zero, zero
@@ -672,7 +680,7 @@ sc_make_cp:
 			
 sc_loop:
 	ldw t3, 0(t1)					; Gets the current element 
-	stw t3, 0x200(t1)				; Stores it in CP section, which is a 0x200 offset
+	stw t3, 0x204(t1)				; Stores it in CP section, which is a 0x200 offset
 	
 	addi t1, t1, 4					; Moves to the next element
 
@@ -681,6 +689,7 @@ sc_loop:
 	ori t0, zero, 1					
 	stw t0, CP_VALID(zero)			; Sets CP_VALID to 1
 	ori v0, zero, 1					; Sets return value to 1
+
 sc_ret:
 	ret
 ; END: save_checkpoint
@@ -694,11 +703,12 @@ restore_checkpoint:
 	beq t0, zero, rc_done			; If CP_VALID is equal to 0 then go to DONE
 		
 rc_restore_cp:	
+	call blink_score				; Makes the score blink
 	ori t1, zero, HEAD_X			; First element
 	addi t2, t1, 408				; Last element + 4
 			
 rc_loop:
-	ldw t3, 0x200(t1)				; Gets the current CP element 
+	ldw t3, 0x204(t1)				; Gets the current CP element 
 	stw t3, 0(t1)					; Stores it in the current element
 	
 	addi t1, t1, 4					; Moves to the next element
@@ -724,12 +734,10 @@ blink_score:
 	addi s2, zero, 12 
 	stw zero, SEVEN_SEGS(s2) 		; Turns off units
 
-	; --- ONLY DO THAT WHEN TESTING ON GECKO
-	add s3, zero, ra				; Saves the return address
-	call wait 						; Calls WAIT function --- ONLY WHEN 
-	add ra, zero ,s3				; Restores the return address
-	; -----
-	
+	stw ra, -4(sp)
+	call wait	
+	ldw ra, -4(sp)
+
 	ldw s4, digit_map(zero)		; Gets the representation of 0
 	stw s4, SEVEN_SEGS(zero) 		; Sets the thousands to 0
 	addi s5, zero, 4
