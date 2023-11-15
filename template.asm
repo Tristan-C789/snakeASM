@@ -224,21 +224,27 @@ ig_GSA_cleared:
 	stw t0, GSA(zero)				; Sets the default position
 
 	; --- Creates food ---
-	stw ra, -4(sp)					; Saves the current return address
+	addi sp, sp, -4
+	stw ra, 0(sp)					; Saves the current return address
+
 	call create_food				; Calls CREATE_FOOD procedure
-	ldw ra, -4(sp)					; Restores the return address
+
+	ldw ra, 0(sp)					; Restores the return address
+	addi sp, sp, 4
 
 	; --- Sets score to 0 ---
 	stw zero, SCORE(zero)
 
 	; --- Redraws LEDs ---
-	stw ra, -4(sp)					; Stores the return address
-	
+	addi sp, sp, -4
+	stw ra, 0(sp)					; Saves the current return address
+
 	call clear_leds					; Clears the LEDs
 	call draw_array					; Draws the initial array
 	call display_score				; Displays the initial score
 
-	ldw ra, -4(sp)					; Restores the return address
+	ldw ra, 0(sp)					; Restores the return address
+	addi sp, sp, 4
 
 	ret
 ; END: init_game
