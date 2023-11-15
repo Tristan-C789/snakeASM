@@ -204,39 +204,29 @@ init_game:
 	stw zero, TAIL_Y(zero)
 
 	; --- Clears the GSA ---
-	ori t0, zero, 11				; Sets x to 11
-ig_for_x:							; --- TOP OF X LOOP ---
-	blt t0, zero, ig_x_end			; While x > 0, else goes to the end of the x loop
+	ori t0, zero, 96				; Sets the upper limit
+	ori t1, zero, 0					; Initializes the counter
 
-	ori t1, zero, 7					; Sets y to 7
-		
-ig_for_y:							; --- TOP OF Y LOOP ---
-	blt t1, zero, ig_y_end			; While y > 0, else goes to the end of the y loop
-
-	slli t2, t0, 3					; = x * 8
-	add t2, t2, t1					; = x * 8 + y which is the corresponding index/offset in the GSA 
-
-	slli t3, t2, 2					; Multiplies by 4 the GSA index to get the offset
-
-	stw zero, GSA(t3)					; -> Sets this GSA value to 0
+ig_clear_GSA:
+	beq t0, t1, ig_GSA_cleared		; If counter == upper limit, then end
 	
-	addi t1, t1, -1					; Removes 1 from y
-	jmpi ig_for_y					; Goes to the top of y loop
+	slli t2, t1, 2					; Gets address from counter
 
-ig_y_end:							; --- END OF Y LOOP ---
-	addi t0, t0, -1					; Removes 1 from x
-	jmpi ig_for_x					; Goes to the top of x loop
+	stw zero, GSA(t2)				; Resets GSA's element
 
-ig_x_end:							; --- END OF X LOOP ---
+	addi t1, t1, 1					; Adds 1 to counter
 
+	br ig_clear_GSA
+
+ig_GSA_cleared:
 	; --- Initializes the GSA with snake position and direction ---
 	ori t0, zero, DIR_RIGHT 		; Sets the default direction
 	stw t0, GSA(zero)				; Sets the default position
 
 	; --- Creates food ---
-	or s0, zero, ra					; Saves the current return address
+	stw ra, -4(sp)					; Saves the current return address
 	call create_food				; Calls CREATE_FOOD procedure
-	or ra, zero, s0					; Restores the return address
+	ldw ra, -4(sp)					; Restores the return address
 
 	; --- Sets score to 0 ---
 	stw zero, SCORE(zero)
@@ -249,39 +239,6 @@ ig_x_end:							; --- END OF X LOOP ---
 	call display_score				; Displays the initial score
 
 	ldw ra, -4(sp)					; Restores the return address
-
-	; --- Sets all temporary registers to 0 ---
-	or t0, zero, zero
-	or t1, zero, zero
-	or t2, zero, zero
-	or t3, zero, zero
-	or t4, zero, zero
-	or t5, zero, zero
-	or t6, zero, zero
-	or t7, zero, zero
-
-	; --- Sets all saved registers to 0 ---
-	or s0, zero, zero
-	or s1, zero, zero
-	or s2, zero, zero
-	or s3, zero, zero
-	or s4, zero, zero
-	or s5, zero, zero
-	or s6, zero, zero
-	or s7, zero, zero
-
-	; --- Sets all argument registers to 0 ---
-	or a0, zero, zero
-	or a1, zero, zero
-	or a2, zero, zero
-	or a3, zero, zero
-
-	; --- Sets all return registers to 0 ---
-	or v0, zero, zero
-	or v1, zero, zero
-
-	; --- Sets stack pointer back to original position ---
-	ori sp, zero, LEDS
 
 	ret
 ; END: init_game
@@ -378,11 +335,11 @@ ht_new_coord:
 	jmpi ht_done
 
 ht_hit_obs:
-	ori v0, v0, 2					; Sets the return value to 2 if an obstacle is going to be hit
+	ori v0, zero, 2					; Sets the return value to 2 if an obstacle is going to be hit
 	jmpi ht_done	
 
 ht_hit_food:
-	ori v0, v0, 1					; Sets the return value to 1 if food is going to be eaten
+	ori v0, zero, 1					; Sets the return value to 1 if food is going to be eaten
 
 ht_done:
 	ret
